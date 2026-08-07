@@ -7,9 +7,10 @@ import { audioManager } from '@/lib/audioManager';
 
 interface PlayablePlayerProps {
   onPositionUpdate: (pos: [number, number, number]) => void;
-  onFirstMove: () => void;
+  onFirstMove?: () => void;
   joystickInput?: { x: number; y: number } | null;
   isMobileJumpPressed?: boolean;
+  isLocked?: boolean;
 }
 
 export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
@@ -17,6 +18,7 @@ export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
   onFirstMove,
   joystickInput,
   isMobileJumpPressed,
+  isLocked = false,
 }) => {
   const groupRef = useRef<THREE.Group>(null);
   const velocity = useRef(new THREE.Vector3(0, 0, 0));
@@ -49,7 +51,7 @@ export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
         !hasTriggeredMove.current
       ) {
         hasTriggeredMove.current = true;
-        onFirstMove();
+        onFirstMove?.();
       }
 
       if (e.code === 'Space' && !isJumping.current && spawnScale >= 1.0) {
@@ -88,6 +90,14 @@ export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
     const moveSpeed = keys.current['ShiftLeft'] || keys.current['ShiftRight'] ? 12 : 7;
     const moveVector = new THREE.Vector3();
 
+    if (
+        !hasTriggeredMove.current &&
+        (keys.current['KeyW'] || keys.current['KeyA'] || keys.current['KeyS'] || keys.current['KeyD'] || keys.current['ArrowUp'] || keys.current['ArrowDown'] || keys.current['ArrowLeft'] || keys.current['ArrowRight'] || joystickInput)
+      ) {
+        hasTriggeredMove.current = true;
+        onFirstMove?.();
+      }
+
     // Desktop Keyboard Movement
     if (keys.current['KeyW'] || keys.current['ArrowUp']) moveVector.z -= 1;
     if (keys.current['KeyS'] || keys.current['ArrowDown']) moveVector.z += 1;
@@ -98,11 +108,14 @@ export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
     if (joystickInput && (Math.abs(joystickInput.x) > 0.1 || Math.abs(joystickInput.y) > 0.1)) {
       moveVector.x = joystickInput.x;
       moveVector.z = -joystickInput.y;
-
       if (!hasTriggeredMove.current) {
         hasTriggeredMove.current = true;
-        onFirstMove();
+        onFirstMove?.();
       }
+    }
+
+    if (isLocked) {
+      moveVector.set(0, 0, 0);
     }
 
     if (moveVector.lengthSq() > 0) {
@@ -152,14 +165,19 @@ export const PlayablePlayer: React.FC<PlayablePlayerProps> = ({
     }
 
     // Vertical Physics & Jump Mechanics
-    if (isJumping.current || groupRef.current.position.y > 0.5) {
-      groupRef.current.position.y += velocity.current.y * delta;
-      velocity.current.y -= 22 * delta;
+    groupRef.current.position.y += velocity.current.y * delta;
+    velocity.current.y -= 22 * delta;
 
-      if (groupRef.current.position.y <= 0.5) {
-        groupRef.current.position.y = 0.5;
-        isJumping.current = false;
-        velocity.current.y = 0;
+    const isGrounded = groupRef.current.position.y <= 0.51;
+    if (isGrounded) {
+      groupRef.current.position.y = 0.5;
+      velocity.current.y = 0;
+
+      // Jump
+      const jumpInput = keys.current['Space'] || isMobileJumpPressed;
+      if (jumpInput && !isLocked && spawnScale >= 1.0) {
+        velocity.current.y = 7.5;
+        audioManager.playJumpSound();
       }
     }
 

@@ -176,6 +176,70 @@ class AudioManager {
 
   // --- CINEMATIC AUDIO SYNTHESIZERS ---
 
+  public startMilestone5Cinematic() {
+    if (this.isMuted) return;
+    this.initCtx();
+    if (!this.ctx) return;
+
+    this.stopCinematicAudio();
+
+    // t=0s: Wind
+    const windOsc = this.ctx.createOscillator();
+    const windGain = this.ctx.createGain();
+    windOsc.type = 'sine';
+    windOsc.frequency.setValueAtTime(150, this.ctx.currentTime);
+    windOsc.frequency.linearRampToValueAtTime(800, this.ctx.currentTime + 10);
+    windGain.gain.setValueAtTime(0.001, this.ctx.currentTime);
+    windGain.gain.linearRampToValueAtTime(0.05, this.ctx.currentTime + 5);
+    windOsc.connect(windGain);
+    windGain.connect(this.ctx.destination);
+    windOsc.start();
+    this.cinematicNodes.push(windOsc, windGain);
+
+    // t=7s: Energy Charging
+    setTimeout(() => {
+      if (!this.ctx || this.isMuted) return;
+      const chargeOsc = this.ctx.createOscillator();
+      const chargeGain = this.ctx.createGain();
+      chargeOsc.type = 'sine';
+      chargeOsc.frequency.setValueAtTime(200, this.ctx.currentTime);
+      chargeOsc.frequency.exponentialRampToValueAtTime(2000, this.ctx.currentTime + 6.0);
+      chargeGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      chargeGain.gain.linearRampToValueAtTime(0.1, this.ctx.currentTime + 6.0);
+      chargeGain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + 7.0);
+      chargeOsc.connect(chargeGain);
+      chargeGain.connect(this.ctx.destination);
+      chargeOsc.start();
+      chargeOsc.stop(this.ctx.currentTime + 7.0);
+    }, 7000);
+
+    // t=13s: Deep Mechanical Rumble & Choir
+    setTimeout(() => {
+      if (!this.ctx || this.isMuted) return;
+      const rumbleOsc = this.ctx.createOscillator();
+      const rumbleGain = this.ctx.createGain();
+      rumbleOsc.type = 'sawtooth';
+      rumbleOsc.frequency.setValueAtTime(40, this.ctx.currentTime);
+      rumbleGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      rumbleGain.gain.linearRampToValueAtTime(0.15, this.ctx.currentTime + 2.0);
+      rumbleOsc.connect(rumbleGain);
+      rumbleGain.connect(this.ctx.destination);
+      rumbleOsc.start();
+      this.cinematicNodes.push(rumbleOsc, rumbleGain);
+
+      const choirOsc = this.ctx.createOscillator();
+      const choirGain = this.ctx.createGain();
+      choirOsc.type = 'sine';
+      choirOsc.frequency.setValueAtTime(880, this.ctx.currentTime);
+      choirGain.gain.setValueAtTime(0.01, this.ctx.currentTime);
+      choirGain.gain.linearRampToValueAtTime(0.12, this.ctx.currentTime + 4.0);
+      choirOsc.connect(choirGain);
+      choirGain.connect(this.ctx.destination);
+      choirOsc.start();
+      this.cinematicNodes.push(choirOsc, choirGain);
+    }, 13000);
+  }
+
   public startCinematicSoundscape() {
     if (this.isMuted) return;
     this.initCtx();

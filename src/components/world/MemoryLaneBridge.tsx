@@ -12,12 +12,18 @@ interface MemoryLaneBridgeProps {
   playerPos: [number, number, number];
   onStoneActivate: (id: string, text: string) => void;
   onStoneDeactivate: (id: string) => void;
+  isM5Triggered?: boolean;
+  isM5Awakened?: boolean;
+  isM5Opened?: boolean;
 }
 
 export const MemoryLaneBridge: React.FC<MemoryLaneBridgeProps> = ({
   playerPos,
   onStoneActivate,
   onStoneDeactivate,
+  isM5Triggered = false,
+  isM5Awakened = false,
+  isM5Opened = false,
 }) => {
   const debrisRef = useRef<THREE.InstancedMesh>(null);
 
@@ -91,7 +97,7 @@ export const MemoryLaneBridge: React.FC<MemoryLaneBridgeProps> = ({
       </instancedMesh>
 
       {/* 3D Spatial Memory Echoes & Storytelling Props */}
-      <HolographicEchoes playerPos={playerPos} />
+      <HolographicEchoes playerPos={playerPos} isCinematicTriggered={isM5Triggered} />
       <EnvironmentalProps />
 
       {/* 4 Interactive Memory Stones */}
@@ -108,7 +114,7 @@ export const MemoryLaneBridge: React.FC<MemoryLaneBridgeProps> = ({
       ))}
 
       {/* Massive Locked Gateway at End of Memory Lane */}
-      <EndGateway />
+      <EndGateway isAwakened={isM5Awakened} isOpened={isM5Opened} />
     </group>
   );
 };

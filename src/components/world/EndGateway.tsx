@@ -1,10 +1,59 @@
 'use client';
 
-import React from 'react';
+import React, { useRef } from 'react';
+import { useFrame } from '@react-three/fiber';
 import { Text } from '@react-three/drei';
 import * as THREE from 'three';
 
-export const EndGateway: React.FC = () => {
+interface EndGatewayProps {
+  isAwakened?: boolean;
+  isOpened?: boolean;
+}
+
+export const EndGateway: React.FC<EndGatewayProps> = ({ isAwakened = false, isOpened = false }) => {
+  const forcefieldRef = useRef<THREE.MeshBasicMaterial>(null);
+  const coreEnergyRef = useRef<THREE.MeshStandardMaterial>(null);
+  const symbolTextRef = useRef<any>(null);
+  const lockTextRef = useRef<any>(null);
+
+  useFrame((state) => {
+    const delta = state.clock.getDelta();
+
+    // Animate Ancient Symbols (Journey Continues) when Awakened
+    if (symbolTextRef.current) {
+      if (isAwakened) {
+        symbolTextRef.current.fillOpacity = THREE.MathUtils.lerp(symbolTextRef.current.fillOpacity, 1.0, 2 * delta);
+        symbolTextRef.current.color = '#FFFFFF';
+      } else {
+        symbolTextRef.current.fillOpacity = 0.4;
+        symbolTextRef.current.color = '#A855F7';
+      }
+    }
+
+    // Animate Lock Label
+    if (lockTextRef.current) {
+      if (isOpened) {
+        lockTextRef.current.fillOpacity = THREE.MathUtils.lerp(lockTextRef.current.fillOpacity, 0, 4 * delta);
+      }
+    }
+
+    // Animate Forcefield drops when Opened
+    if (forcefieldRef.current) {
+      if (isOpened) {
+        forcefieldRef.current.opacity = THREE.MathUtils.lerp(forcefieldRef.current.opacity, 0, 3 * delta);
+      } else if (isAwakened) {
+        forcefieldRef.current.opacity = 0.8 + Math.sin(state.clock.getElapsedTime() * 10) * 0.2; // pulse
+      }
+    }
+
+    // Animate Core Energy glow
+    if (coreEnergyRef.current) {
+      if (isAwakened) {
+        coreEnergyRef.current.emissiveIntensity = THREE.MathUtils.lerp(coreEnergyRef.current.emissiveIntensity, 4.0, 2 * delta);
+      }
+    }
+  });
+
   return (
     <group position={[0, 0, -76]}>
       {/* Outer Black Metallic Pillars */}
@@ -40,17 +89,23 @@ export const EndGateway: React.FC = () => {
         <meshStandardMaterial color="#EC4899" emissive="#EC4899" emissiveIntensity={2.5} />
       </mesh>
 
+      {/* Energy Core at Center (absorbs memories) */}
+      <mesh position={[0, 8, 0.5]}>
+        <sphereGeometry args={[isAwakened ? 1.5 : 0.5, 32, 32]} />
+        <meshStandardMaterial ref={coreEnergyRef} color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={isAwakened ? 2.0 : 0.0} transparent opacity={isAwakened ? 0.9 : 0.0} />
+      </mesh>
+
       {/* Sealed Purple Energy Forcefield Barrier */}
       <mesh position={[0, 7.5, 0]}>
         <planeGeometry args={[11.5, 14]} />
-        <meshBasicMaterial color="#A855F7" transparent opacity={0.5} side={THREE.DoubleSide} wireframe />
+        <meshBasicMaterial ref={forcefieldRef} color="#A855F7" transparent opacity={0.5} side={THREE.DoubleSide} wireframe />
       </mesh>
 
-      {/* 3D Label */}
-      <Text position={[0, 18, 0]} fontSize={0.8} color="#A855F7" anchorX="center">
+      {/* 3D Label (Ancient Symbols) */}
+      <Text ref={symbolTextRef} position={[0, 18, 0]} fontSize={0.8} color="#A855F7" anchorX="center" fillOpacity={0.4}>
         Journey Continues
       </Text>
-      <Text position={[0, 7.5, 0.2]} fontSize={0.4} color="#EC4899" anchorX="center">
+      <Text ref={lockTextRef} position={[0, 7.5, 0.2]} fontSize={0.4} color="#EC4899" anchorX="center">
         [ LOCKED GATEWAY ]
       </Text>
     </group>

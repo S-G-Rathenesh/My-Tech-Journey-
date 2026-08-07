@@ -14,6 +14,7 @@ import { HUDOverlay } from '../ui/HUDOverlay';
 import { MobileControls } from '../ui/MobileControls';
 import { Bot, Sparkles } from 'lucide-react';
 import { audioManager } from '@/lib/audioManager';
+import { Milestone5Camera } from '../cinematic/Milestone5Camera';
 
 export const NeonGatewayScene: React.FC = () => {
   const [playerPos, setPlayerPos] = useState<[number, number, number]>([0, 0.5, 0]);
@@ -25,17 +26,74 @@ export const NeonGatewayScene: React.FC = () => {
   const [joystickInput, setJoystickInput] = useState<{ x: number; y: number } | null>(null);
   const [isMobileJumpPressed, setIsMobileJumpPressed] = useState(false);
 
+  // Milestone 5 Orchestration State
+  const [m5State, setM5State] = useState<{
+    phase: number; // 0 = idle, 1 = triggered, 2 = memories travel, 3 = gate opens, 4 = camera push, 5 = fade white
+    isLocked: boolean;
+    exaDialog: string | null;
+  }>({ phase: 0, isLocked: false, exaDialog: null });
+
   const lastPosRef = useRef<[number, number, number]>([0, 0.5, 0]);
+  const m5TriggeredRef = useRef(false);
+
+  // Milestone 5 Trigger Logic (Z <= -72)
+  useEffect(() => {
+    if (playerPos[2] <= -72 && !m5TriggeredRef.current) {
+      m5TriggeredRef.current = true;
+      startMilestone5Sequence();
+    }
+  }, [playerPos]);
+
+  const startMilestone5Sequence = () => {
+    // Lock player, start sequence
+    setM5State({ phase: 1, isLocked: true, exaDialog: null });
+    audioManager.startMilestone5Cinematic();
+
+    // t=1s: EXA Dialogue 1
+    setTimeout(() => {
+      setM5State(s => ({ ...s, exaDialog: "You've reached the end of the memories..." }));
+    }, 1000);
+
+    // t=3s: EXA Dialogue 2
+    setTimeout(() => {
+      setM5State(s => ({ ...s, exaDialog: "But every memory becomes the foundation for creation." }));
+    }, 4000);
+
+    // t=6s: EXA Dialogue 3
+    setTimeout(() => {
+      setM5State(s => ({ ...s, exaDialog: "Let's continue." }));
+    }, 6000);
+
+    // t=7s: Phase 2 (Memories Travel)
+    setTimeout(() => {
+      setM5State(s => ({ ...s, phase: 2, exaDialog: null }));
+    }, 7000);
+
+    // t=13s: Phase 3 (Gate Opens / Awakens)
+    setTimeout(() => {
+      setM5State(s => ({ ...s, phase: 3 }));
+    }, 13000);
+
+    // t=16s: Phase 4 (Camera Takes Control)
+    setTimeout(() => {
+      setM5State(s => ({ ...s, phase: 4 }));
+    }, 16000);
+
+    // t=21s: Phase 5 (Fade to White)
+    setTimeout(() => {
+      setM5State(s => ({ ...s, phase: 5 }));
+    }, 21000);
+  };
 
   // Periodic subtle mechanical typing sound on movement down Memory Lane
   useEffect(() => {
     const dx = Math.abs(playerPos[0] - lastPosRef.current[0]);
     const dz = Math.abs(playerPos[2] - lastPosRef.current[1]);
-    if ((dx > 0.05 || dz > 0.05) && playerPos[2] < -20 && Math.random() < 0.15) {
+    if ((dx > 0.05 || dz > 0.05) && playerPos[2] < -20 && Math.random() < 0.15 && m5State.phase === 0) {
       audioManager.playSubtleTyping();
     }
     lastPosRef.current = [playerPos[0], playerPos[2], 0];
-  }, [playerPos]);
+  }, [playerPos, m5State.phase]);
 
   // 4-Stage Natural Color & Lighting Progression based on Player Z
   const z = playerPos[2];
@@ -73,21 +131,30 @@ export const NeonGatewayScene: React.FC = () => {
     pointLightColor = '#F43F5E';
   }
 
+  // Override lighting during cinematic sequence Phase 3+
+  if (m5State.phase >= 3) {
+    ambientIntensity = 2.0;
+    directionalIntensity = 4.0;
+    pointLightColor = '#FFFFFF';
+  }
+
   let zoneLabel = 'Neon Gateway';
   if (z < -20) {
     zoneLabel = 'Memory Lane';
   }
 
   const handleFirstMove = () => {
-    if (!hasMoved) {
+    if (!hasMoved && m5State.phase === 0) {
       setHasMoved(true);
       audioManager.playZoneChime();
     }
   };
 
   const handleStoneActivate = (id: string, text: string) => {
-    setActiveStoneText(text);
-    audioManager.playExaChime();
+    if (m5State.phase === 0) {
+      setActiveStoneText(text);
+      audioManager.playExaChime();
+    }
   };
 
   const handleStoneDeactivate = () => {
@@ -95,8 +162,10 @@ export const NeonGatewayScene: React.FC = () => {
   };
 
   const handleMobileJumpPress = () => {
-    setIsMobileJumpPressed(true);
-    setTimeout(() => setIsMobileJumpPressed(false), 200);
+    if (m5State.phase === 0) {
+      setIsMobileJumpPressed(true);
+      setTimeout(() => setIsMobileJumpPressed(false), 200);
+    }
   };
 
   return (
@@ -107,6 +176,9 @@ export const NeonGatewayScene: React.FC = () => {
         camera={{ position: [0, 6.5, 10.5], fov: 60 }}
         gl={{ antialias: true, alpha: false }}
       >
+        {/* Milestone 5 Camera Takeover */}
+        <Milestone5Camera isActive={m5State.phase >= 4} />
+
         {/* 4-Stage Fog & Lighting Atmosphere */}
         <fog attach="fog" args={[fogColor, 15, 75]} />
         <ambientLight intensity={ambientIntensity} color="#1E1B4B" />
@@ -124,6 +196,9 @@ export const NeonGatewayScene: React.FC = () => {
           playerPos={playerPos}
           onStoneActivate={handleStoneActivate}
           onStoneDeactivate={handleStoneDeactivate}
+          isM5Triggered={m5State.phase >= 2}
+          isM5Awakened={m5State.phase >= 3}
+          isM5Opened={m5State.phase >= 4}
         />
 
         {/* Playable Player Avatar */}
@@ -132,6 +207,7 @@ export const NeonGatewayScene: React.FC = () => {
           onFirstMove={handleFirstMove}
           joystickInput={joystickInput}
           isMobileJumpPressed={isMobileJumpPressed}
+          isLocked={m5State.isLocked}
         />
 
         {/* Floating EXA Companion */}
@@ -139,7 +215,7 @@ export const NeonGatewayScene: React.FC = () => {
 
         {/* Postprocessing Bloom & Chromatic Aberration */}
         <EffectComposer>
-          <Bloom intensity={1.6} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
+          <Bloom intensity={m5State.phase >= 4 ? 3.0 : 1.6} luminanceThreshold={0.2} luminanceSmoothing={0.9} mipmapBlur />
           <ChromaticAberration
             offset={new THREE.Vector2(0.0012, 0.0012)}
             radialModulation={false}
@@ -149,11 +225,16 @@ export const NeonGatewayScene: React.FC = () => {
         </EffectComposer>
       </Canvas>
 
+      {/* Fade To White Ending Overlay */}
+      {m5State.phase >= 5 && (
+        <div className="absolute inset-0 z-50 bg-white animate-fadeIn" style={{ animationDuration: '3s' }} />
+      )}
+
       {/* Tutorial HUD Overlay (Hides on movement) */}
       <TutorialOverlay hasMoved={hasMoved} />
 
-      {/* EXA Memory Stone Proximity Narration Callout */}
-      {activeStoneText && (
+      {/* EXA Memory Stone Proximity Narration Callout OR Cinematic Dialogue */}
+      {(activeStoneText || m5State.exaDialog) && (
         <div className="fixed bottom-24 left-1/2 -translate-x-1/2 z-40 pointer-events-none font-sans animate-fadeIn">
           <div className="glass-panel px-6 py-3 rounded-2xl border border-purple-500/50 shadow-cyber-purple flex items-center space-x-3 bg-purple-950/85 backdrop-blur-md">
             <div className="w-8 h-8 rounded-xl bg-purple-900 border border-purple-400 flex items-center justify-center shrink-0 shadow-cyber-purple">
@@ -164,31 +245,35 @@ export const NeonGatewayScene: React.FC = () => {
                 <Sparkles className="w-3 h-3 text-purple-400" /> EXA MEMORY RECOVERY
               </div>
               <div className="text-xs font-extrabold text-white text-glow-purple tracking-wide">
-                "{activeStoneText}"
+                "{m5State.exaDialog || activeStoneText}"
               </div>
             </div>
           </div>
         </div>
       )}
 
-      {/* Glassmorphic HUD Overlay */}
-      <HUDOverlay
-        currentZone={zoneLabel}
-        playerPos={playerPos}
-        proximityProjectId={null}
-        onOpenExaChat={() => {}}
-        onOpenProjectModal={() => {}}
-        onOpenContactModal={() => {}}
-        isMuted={isMuted}
-        onToggleMute={() => setIsMuted(audioManager.toggleMute())}
-      />
+      {/* Glassmorphic HUD Overlay (hide during cinematic) */}
+      {!m5State.isLocked && (
+        <HUDOverlay
+          currentZone={zoneLabel}
+          playerPos={playerPos}
+          proximityProjectId={null}
+          onOpenExaChat={() => {}}
+          onOpenProjectModal={() => {}}
+          onOpenContactModal={() => {}}
+          isMuted={isMuted}
+          onToggleMute={() => setIsMuted(audioManager.toggleMute())}
+        />
+      )}
 
       {/* Touch Screen Controls for Mobile */}
-      <MobileControls
-        onJoystickMove={setJoystickInput}
-        onJumpPress={handleMobileJumpPress}
-        onInteractPress={() => {}}
-      />
+      {!m5State.isLocked && (
+        <MobileControls
+          onJoystickMove={setJoystickInput}
+          onJumpPress={handleMobileJumpPress}
+          onInteractPress={() => {}}
+        />
+      )}
     </div>
   );
 };

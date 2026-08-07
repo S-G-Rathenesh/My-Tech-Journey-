@@ -20,25 +20,47 @@ const ECHOS: EchoItem[] = [
   { text: 'Dream Bigger', pos: [3.2, 3.2, -70], color: '#F43F5E' },
 ];
 
-export const HolographicEchoes: React.FC<{ playerPos: [number, number, number] }> = ({ playerPos }) => {
+export const HolographicEchoes: React.FC<{ playerPos: [number, number, number]; isCinematicTriggered?: boolean }> = ({ playerPos, isCinematicTriggered = false }) => {
   const groupRef = useRef<THREE.Group>(null);
+  const gateCore = new THREE.Vector3(0, 8, -76);
 
   useFrame((state) => {
     if (!groupRef.current) return;
     const time = state.clock.getElapsedTime();
+    const delta = state.clock.getDelta();
 
     groupRef.current.children.forEach((child, i) => {
-      // Gentle floating bob
-      child.position.y = ECHOS[i].pos[1] + Math.sin(time * 1.2 + i) * 0.15;
+      if (!isCinematicTriggered) {
+        // Gentle floating bob
+        child.position.y = ECHOS[i].pos[1] + Math.sin(time * 1.2 + i) * 0.15;
+      } else {
+        // Fly towards Energy Core and Orbit
+        const targetPos = gateCore.clone();
+        
+        // Add orbit offset
+        const radius = Math.max(0, 2 - (time * 0.2)); // spiral inward
+        const angle = time * 2 + (i * Math.PI * 2) / ECHOS.length;
+        targetPos.x += Math.cos(angle) * radius;
+        targetPos.y += Math.sin(angle) * radius;
+        targetPos.z += Math.sin(angle * 0.5) * radius;
+
+        // Smooth translation
+        child.position.lerp(targetPos, 0.05 + i * 0.01);
+        
+        // Scale down to simulate absorption
+        if (child.position.distanceTo(gateCore) < 1.0) {
+          child.scale.lerp(new THREE.Vector3(0, 0, 0), 0.1);
+        }
+      }
     });
   });
 
   return (
     <group ref={groupRef}>
       {ECHOS.map((echo, idx) => {
-        // Distance check for subtle opacity breathing
+        // Distance check for subtle opacity breathing (only if not cinematic)
         const dz = Math.abs(playerPos[2] - echo.pos[2]);
-        const opacity = Math.max(0.1, 1 - Math.min(dz / 18, 1));
+        const opacity = isCinematicTriggered ? 1.0 : Math.max(0.1, 1 - Math.min(dz / 18, 1));
 
         return (
           <group key={idx} position={echo.pos}>
